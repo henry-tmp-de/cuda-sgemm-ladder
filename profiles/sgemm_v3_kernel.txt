@@ -1,0 +1,139 @@
+==PROF== Connected to process 3458643 (/home/ziru/cuda-gemm-ladder/sgemm_bench)
+==PROF== Profiling "sgemm_v3_kernel": 0%....50%....100% - 14 passes
+=== SGEMM Ladder Benchmark ===
+GPU        : NVIDIA GeForce RTX 3090 (sm_86, 82 SMs)
+Shape      : M=N=K=4096  (137.44 GFLOP)
+Peak FP32  : 35.58 TFLOPS (1695 MHz x 10496 cores x 2)
+Mem BW     : 936.1 GB/s (theoretical)
+cuBLAS     : CUBLAS_DEFAULT_MATH (strict FP32, no TF32)
+
+version          median(ms)       GFLOPS  vs cuBLAS      max_err  note
+cuBLAS(FP32)         5.8737      23399.2     100.0%            -  baseline
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v0-naive            63.1992       2174.7       9.3%     0.00e+00  one thread per element
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v1-smem             47.5689       2889.3      12.3%     0.00e+00  32x32 block tile
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v2-thread1d         20.2271       6794.8      29.0%     0.00e+00  TM=8, one column per thread
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v3-thread2d          9.1812      14969.6      64.0%     0.00e+00  TM=TN=8, outer product
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v4-vec4              8.1326      16899.7      72.2%     0.00e+00  float4 + transposed A tile
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v5-dbuf              8.1736      16815.1      71.9%     0.00e+00  manual double buffering
+               [diag] max|C|=28.604  max|C_ref|=28.604
+v6-cpasync           7.3564      18682.9      79.8%     0.00e+00  cp.async 3-stage pipeline
+==PROF== Disconnected from process 3458643
+[3458643] sgemm_bench@127.0.0.1
+  void sgemm_v3_kernel<128, 128, 16, 8, 8>(const float *, const float *, float *, int, int, int) (32, 32, 1)x(16, 16, 1), Context 1, Stream 7, Device 0, CC 8.6
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- -------------
+    Metric Name             Metric Unit  Metric Value
+    ----------------------- ----------- -------------
+    DRAM Frequency                  Ghz          9.49
+    SM Frequency                    Ghz          1.39
+    Elapsed Cycles                cycle    15,215,128
+    Memory Throughput                 %         60.86
+    DRAM Throughput                   %          9.91
+    Duration                         ms         10.93
+    L1/TEX Cache Throughput           %         63.46
+    L2 Cache Throughput               %         20.68
+    SM Active Cycles              cycle 14,619,044.51
+    Compute (SM) Throughput           %         59.23
+    ----------------------- ----------- -------------
+
+    INF   Compute and Memory are well-balanced: To reduce runtime, both computation and memory traffic must be reduced. 
+          Check both the Compute Workload Analysis and Memory Workload Analysis sections.                               
+
+    Section: Memory Workload Analysis
+    ---------------------------- ----------- ------------
+    Metric Name                  Metric Unit Metric Value
+    ---------------------------- ----------- ------------
+    Memory Throughput                Gbyte/s        90.32
+    Mem Busy                               %        60.86
+    Max Bandwidth                          %        34.90
+    L1/TEX Hit Rate                        %         3.03
+    L2 Compression Success Rate            %            0
+    L2 Compression Ratio                                0
+    L2 Compression Input Sectors      sector            0
+    L2 Hit Rate                            %        80.96
+    Mem Pipes Busy                         %        32.30
+    ---------------------------- ----------- ------------
+
+    Section: Scheduler Statistics
+    ---------------------------- ----------- ------------
+    Metric Name                  Metric Unit Metric Value
+    ---------------------------- ----------- ------------
+    One or More Eligible                   %        61.78
+    Issued Warp Per Scheduler                        0.62
+    No Eligible                            %        38.22
+    Active Warps Per Scheduler          warp         3.87
+    Eligible Warps Per Scheduler        warp         1.96
+    ---------------------------- ----------- ------------
+
+    Section: Warp State Statistics
+    ---------------------------------------- ----------- ------------
+    Metric Name                              Metric Unit Metric Value
+    ---------------------------------------- ----------- ------------
+    Warp Cycles Per Issued Instruction             cycle         6.27
+    Warp Cycles Per Executed Instruction           cycle         6.27
+    Avg. Active Threads Per Warp                                   32
+    Avg. Not Predicated Off Threads Per Warp                    31.86
+    ---------------------------------------- ----------- ------------
+
+    WRN   The optional metric smsp__pcsamp_sample_count could not be found. Collecting it as an additional metric could 
+          enable the rule to provide more guidance.                                                                     
+    ----- --------------------------------------------------------------------------------------------------------------
+    OPT   Est. Local Speedup: 34.61%                                                                                    
+          On average, each warp of this workload spends 2.2 cycles being stalled waiting for the micro scheduler to     
+          select the warp to issue. Not selected warps are eligible warps that were not picked by the scheduler to      
+          issue that cycle as another warp was selected. A high number of not selected warps typically means you have   
+          sufficient warps to cover warp latencies and you may consider reducing the number of active warps to          
+          possibly increase cache coherence and data locality. This stall type represents about 34.6% of the total      
+          average of 6.3 cycles between issuing two instructions.                                                       
+    ----- --------------------------------------------------------------------------------------------------------------
+    INF   Check the Warp Stall Sampling (All Samples) table for the top stall locations in your source based on         
+          sampling data. The Kernel Profiling Guide                                                                     
+          (https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-reference) provides more details    
+          on each stall reason.                                                                                         
+
+    Section: Launch Statistics
+    -------------------------------- --------------- ---------------
+    Metric Name                          Metric Unit    Metric Value
+    -------------------------------- --------------- ---------------
+    Block Size                                                   256
+    Function Cache Configuration                     CachePreferNone
+    Grid Size                                                  1,024
+    Registers Per Thread             register/thread             128
+    Shared Memory Configuration Size           Kbyte           65.54
+    Driver Shared Memory Per Block       Kbyte/block            1.02
+    Dynamic Shared Memory Per Block       byte/block               0
+    Static Shared Memory Per Block       Kbyte/block           16.38
+    # SMs                                         SM              82
+    Stack Size                                                 1,024
+    Threads                                   thread         262,144
+    # TPCs                                                        41
+    Enabled TPC IDs                                              all
+    Uses Green Context                                             0
+    Waves Per SM                                                6.24
+    -------------------------------- --------------- ---------------
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Block Limit SM                        block           16
+    Block Limit Registers                 block            2
+    Block Limit Shared Mem                block            3
+    Block Limit Warps                     block            6
+    Theoretical Active Warps per SM        warp           16
+    Theoretical Occupancy                     %        33.33
+    Achieved Occupancy                        %        32.30
+    Achieved Active Warps Per SM           warp        15.50
+    ------------------------------- ----------- ------------
+
+    OPT   Est. Local Speedup: 66.67%                                                                                    
+          The 4.00 theoretical warps per scheduler this kernel can issue according to its occupancy are below the       
+          hardware maximum of 12. This kernel's theoretical occupancy (33.3%) is limited by the number of required      
+          registers.                                                                                                    
+

@@ -1,0 +1,13 @@
+# 编译产物
+*.o
+sgemm_bench
+bin/
+
+# Nsight Compute 二进制报告（文本版 profiles/*.txt 要保留，那是证据）
+*.ncu-rep
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
