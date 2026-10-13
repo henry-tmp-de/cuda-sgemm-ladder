@@ -26,6 +26,9 @@ import json
 import sqlite3
 import sys
 
+# CUDA 用 0xFFFFFFFF 表示"没有绑定到具体流"（设备级同步）
+SYNC_TID = 0xFFFFFFFF
+
 
 def table_exists(db, name):
     return (
@@ -111,8 +114,10 @@ def main(sqlite_path, out_path):
             "select start, end, streamId, syncType from CUPTI_ACTIVITY_KIND_SYNCHRONIZATION"))
         counts["sync"] = len(rows)
         for start, end, stream, stype in rows:
-            ev("sync", "sync", start, end - start, 0,
-               stream if stream is not None else 0, {"syncType": stype})
+            # 同步点的 streamId 是 0xFFFFFFFF（CUDA 的"无流"哨兵），
+            # 不是真的流号；单独给它一条泳道，别混进 Stream 泳道里。
+            ev("sync", "sync", start, end - start, 0, SYNC_TID,
+               {"syncType": stype})
 
     # ================= pid 1：NVTX =================
     rows = list(db.execute(
@@ -148,8 +153,9 @@ def main(sqlite_path, out_path):
     # GPU 各 stream 泳道
     streams = sorted({e["tid"] for e in events if e["pid"] == 0})
     for s in streams:
+        nm = "设备级同步" if s == SYNC_TID else f"Stream {s}"
         meta.append({"name": "thread_name", "ph": "M", "pid": 0, "tid": s,
-                     "args": {"name": f"Stream {s}"}})
+                     "args": {"name": nm}})
     # CPU 各线程泳道：尽量用 ThreadNames 里的真实线程名
     tid_names = {}
     if table_exists(db, "ThreadNames"):
