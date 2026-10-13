@@ -17,6 +17,14 @@ NVCCFLAGS := -O3 -arch=$(ARCH) -std=c++17 -lineinfo \
              --generate-line-info \
              -Xcompiler -Wall
 
+# NVTX=1 时打开时间线标记，配合 nsys 采集后在 ui.perfetto.dev 上查看：
+#   make clean && make NVTX=1
+#   nsys profile -o gemm_trace ./sgemm_bench 1024 1024 1024
+#   nsys export --type=json --force-overwrite=true -o gemm_trace.json gemm_trace.nsys-rep
+ifeq ($(NVTX),1)
+NVCCFLAGS += -DUSE_NVTX
+endif
+
 SRC := $(wildcard src/*.cu)
 OBJ := $(SRC:.cu=.o)
 

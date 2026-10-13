@@ -12,6 +12,23 @@
 #include <string>
 #include <vector>
 
+// NVTX 区间标记。加上它之后，nsys 采出来的时间线里每个版本会被一个带名字的
+// 区间包住，导出成 Chrome Trace JSON 后在 ui.perfetto.dev 上能直接看出
+// 「这一段是 v4、那一段是 v5」，否则只有一堆长得一样的 kernel 名字。
+// 用 -DUSE_NVTX 打开，默认不开（不影响 benchmark 本体）。
+#ifdef USE_NVTX
+#include <nvtx3/nvToolsExt.h>
+#define NVTX_PUSH(name) nvtxRangePushA(name)
+#define NVTX_POP() nvtxRangePop()
+#else
+#define NVTX_PUSH(name) \
+  do {                  \
+  } while (0)
+#define NVTX_POP() \
+  do {             \
+  } while (0)
+#endif
+
 namespace {
 
 struct Entry {
@@ -69,9 +86,11 @@ int main(int argc, char** argv) {
   gemm::L2Flusher flusher;
 
   // ---- cuBLAS 基线 ----
+  NVTX_PUSH("cuBLAS(FP32)");
   gemm::cublas_sgemm(A, B, C_ref, M, N, K);
   CUDA_CHECK(cudaDeviceSynchronize());
   gemm::Timing t_ref = gemm::time_cublas(A, B, C_ref, M, N, K, flusher);
+  NVTX_POP();
   const double cublas_gf = gemm::gflops(M, N, K, t_ref.median_ms);
 
   // ---- 各版本 ----
@@ -93,6 +112,7 @@ int main(int argc, char** argv) {
 
   std::vector<float> h_c(M * N);
   for (const auto& e : entries) {
+    NVTX_PUSH(e.name);
     CUDA_CHECK(cudaMemset(C, 0, bytes_c));
     e.fn(A, B, C, M, N, K);
     // 关键：launch 之后立刻查错。只靠 cudaDeviceSynchronize 有时会漏掉
@@ -135,6 +155,7 @@ int main(int argc, char** argv) {
     const double gf = gemm::gflops(M, N, K, t.median_ms);
     std::printf("%-14s %12.4f %12.1f %9.1f%% %12.2e  %s\n", e.name,
                 t.median_ms, gf, gf / cublas_gf * 100.0, err, e.note);
+    NVTX_POP();
   }
 
   cudaFree(A);

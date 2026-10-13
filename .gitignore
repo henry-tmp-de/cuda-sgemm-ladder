@@ -6,6 +6,11 @@ bin/
 # Nsight Compute 二进制报告（文本版 profiles/*.txt 要保留，那是证据）
 *.ncu-rep
 
+# nsys 中间产物（perfetto/gemm_trace.json 是给 Perfetto 看的成品，要保留）
+*.nsys-rep
+*.qdstrm
+gemm_trace.sqlite
+
 # 编辑器 / 系统
 .vscode/
 .idea/

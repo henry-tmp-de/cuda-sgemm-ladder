@@ -97,11 +97,24 @@ make                 # 编译
 ./sgemm_bench --quick                # 1024^3 快速迭代
 ```
 
-采集 profile（需要读 GPU 性能计数器的权限）：
+采集**单 kernel 的硬件计数器**（ncu，需要读 GPU 性能计数器的权限）：
 
 ```bash
 sudo bash tools/profile_all.sh       # 默认 4096^3，输出到 profiles/
 ```
+
+采集**整条时间线**（nsys → Perfetto，不需要管理员权限）：
+
+```bash
+make clean && make NVTX=1                              # 打开 NVTX 区间标记
+nsys profile -o gemm_trace --stats=false ./sgemm_bench 1024 1024 1024
+nsys export --type=sqlite --force-overwrite=true -o gemm_trace.sqlite gemm_trace.nsys-rep
+python3 tools/nsys2perfetto.py gemm_trace.sqlite perfetto/gemm_trace.json
+```
+
+然后把 `perfetto/gemm_trace.json` 拖进 **https://ui.perfetto.dev** 查看。
+（现成的产物已经在仓库里：`perfetto/gemm_trace.json`，直接用即可。详见
+[`docs/04-时间线与Perfetto.md`](docs/04-时间线与Perfetto.md)。）
 
 ---
 
@@ -121,11 +134,14 @@ src/
   main.cu            benchmark 驱动
 tools/
   profile_all.sh     ncu 批量采集脚本
+  nsys2perfetto.py   nsys SQLite → Chrome Trace JSON（Perfetto 不认 nsys 自带的 json schema）
 docs/
   01-测量方法.md      尺子是怎么造的（含三个最容易做错的地方）
   02-优化过程复盘.md   ★ 每一版：看到什么指标 → 判断什么瓶颈 → 做了什么 → 结果如何
   03-踩坑记录.md      四个真实 bug 的现象、排查过程、根因
+  04-时间线与Perfetto.md  nsys 时间线怎么采、怎么转、看到了什么
 profiles/            ncu 原始输出
+perfetto/            给 ui.perfetto.dev 看的 Chrome Trace JSON
 ```
 
 ---
@@ -135,3 +151,11 @@ profiles/            ncu 原始输出
 1. [`docs/01-测量方法.md`](docs/01-测量方法.md) —— 没有可信的尺子，后面所有数字都是假的
 2. [`docs/02-优化过程复盘.md`](docs/02-优化过程复盘.md) —— **核心**，每一步的 profile 推理链
 3. [`docs/03-踩坑记录.md`](docs/03-踩坑记录.md) —— 我实际踩的坑，以及怎么定位的
+4. [`docs/04-时间线与Perfetto.md`](docs/04-时间线与Perfetto.md) —— 整体时间线视角（和 ncu 互补）
+
+**两种 profiling 视角的分工**：
+
+| 问题 | 工具 |
+|---|---|
+| 哪个 kernel 值得深挖？整体有没有空档？ | nsys → Perfetto 时间线 |
+| 这个 kernel 为什么慢？瓶颈在哪条流水线？ | ncu 硬件计数器 |
