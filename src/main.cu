@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
       {"v4-vec4", gemm::launch_v4_vec4, "float4 + transposed A tile"},
       {"v5-dbuf", gemm::launch_v5_dbuf, "manual double buffering"},
       {"v6-cpasync", gemm::launch_v6_cpasync, "cp.async 3-stage pipeline"},
+      {"v7-lbcap", gemm::launch_v7_lbcap, "v6 + launch_bounds(256,2)"},
   };
 
   std::printf("%-14s %12s %12s %10s %12s  %s\n", "version", "median(ms)",

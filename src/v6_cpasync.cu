@@ -89,8 +89,12 @@ __device__ __forceinline__ void cp_async_wait() {
     }                                                                         \
   } while (0)
 
-template <int BM, int BN, int BK, int TM, int TN, int STAGES>
-__global__ void __launch_bounds__(((BM / TM) * (BN / TN)))
+// MIN_BLOCKS 是给编译器的"每 SM 至少要有几个 block"的承诺。
+// 它会让 nvcc 反推出每线程允许的寄存器上限：65536 / (THREADS * MIN_BLOCKS)。
+// v6 用 1（不设约束，实测 163 个寄存器、占用率 16.7%）；
+// v7 用 2（把寄存器压到 ≤128，换 2 个 block/SM、33% 占用率，代价是可能 spill）。
+template <int BM, int BN, int BK, int TM, int TN, int STAGES, int MIN_BLOCKS>
+__global__ void __launch_bounds__(((BM / TM) * (BN / TN)), MIN_BLOCKS)
 sgemm_v6_kernel(const float* __restrict__ A,
                 const float* __restrict__ B,
                 float* __restrict__ C,
@@ -178,7 +182,18 @@ void launch_v6_cpasync(const float* A, const float* B, float* C, int M, int N, i
   constexpr int BM = 128, BN = 128, BK = 16, TM = 8, TN = 8, STAGES = 3;
   const dim3 block(BN / TN, BM / TM);  // (16, 16) = 256 线程
   const dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
-  sgemm_v6_kernel<BM, BN, BK, TM, TN, STAGES><<<grid, block>>>(A, B, C, M, N, K);
+  sgemm_v6_kernel<BM, BN, BK, TM, TN, STAGES, 1><<<grid, block>>>(A, B, C, M, N, K);
+}
+
+// v7：和 v6 同一份 kernel，唯一区别是给编译器一个「每 SM 至少 2 个 block」的承诺，
+// 逼它把寄存器从 163 压到 128 以内。这是 ncu 指出的最大潜在收益点
+// （"theoretical occupancy (16.7%) is limited by the number of required registers,
+//   Est. Local Speedup: 83.33%"）的一次直接验证。
+void launch_v7_lbcap(const float* A, const float* B, float* C, int M, int N, int K) {
+  constexpr int BM = 128, BN = 128, BK = 16, TM = 8, TN = 8, STAGES = 3;
+  const dim3 block(BN / TN, BM / TM);
+  const dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+  sgemm_v6_kernel<BM, BN, BK, TM, TN, STAGES, 2><<<grid, block>>>(A, B, C, M, N, K);
 }
 
 }  // namespace gemm

@@ -27,4 +27,8 @@ void launch_v5_dbuf(const float* A, const float* B, float* C, int M, int N, int 
 // v6：cp.async 三级流水 —— global 直接进 smem，不经过寄存器
 void launch_v6_cpasync(const float* A, const float* B, float* C, int M, int N, int K);
 
+// v7：与 v6 同一个 kernel，只是用 __launch_bounds__ 把寄存器压到 128 以内
+//     （验证 ncu 指出的"占用率受限于寄存器"这条线索）
+void launch_v7_lbcap(const float* A, const float* B, float* C, int M, int N, int K);
+
 }  // namespace gemm
