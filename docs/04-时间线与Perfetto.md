@@ -112,6 +112,42 @@ smem   : 12544 B
 
 ---
 
+### 4. CPU 轨道：可以看出发射开销和库的内部开销
+
+补上 `CUPTI_ACTIVITY_KIND_RUNTIME` 之后，时间线上多出一条 **CPU (CUDA API)** 轨道，
+显示每个 `cudaXxx` 调用在 CPU 上花了多久。统计下来：
+
+```
+cudaLaunchKernel_v7000                    999
+cudaEventRecord_v3020                     961
+cuGetProcAddress_v2                       838   ← 不是我们写的
+cudaEventSynchronize_v3020                450
+cudaStreamGetCaptureInfo_v2_v11030        305   ← 也不是我们写的
+cudaMemsetAsync_v3020                      61
+```
+
+**注意 `cuGetProcAddress` 838 次和 `cudaStreamGetCaptureInfo` 305 次** ——
+这两类调用**在我们的源码里一次都没出现过**，是 CUDA runtime 的内部开销
+（符号解析、Graph capture 状态查询）。
+
+> 这是一个用时间线才能发现的东西：**你的程序在 CPU 侧发起的调用，比你写的行数多得多。**
+> 对小 kernel 来说，这些固定开销会变成瓶颈——这也是为什么要做 kernel fusion、
+> 为什么要用 CUDA Graph 把一串发射"录"下来重放。
+> 本项目每个 kernel 都有毫秒级，这点开销可以忽略；但如果换成 elementwise 小算子，就不能忽视了。
+
+### 5. 轨道结构总览
+
+导出的 trace 一共三条 process、四个泳道：
+
+| pid | 轨道 | tid | 内容 |
+|---|---|---|---|
+| 0 | **GPU (CUDA)** | 7 | 1087 个事件：kernel / memset / memcpy |
+| 0 | GPU (CUDA) | 4294967295 | 469 个**设备级同步**（`0xFFFFFFFF` 是"无流"哨兵值，单独一条泳道） |
+| 1 | **NVTX 区间** | 0 | 9 个版本分段 |
+| 2 | **CPU (CUDA API)** | 0 | 3747 个 `cudaXxx` 调用（线程名 `sgemm_bench`） |
+
+---
+
 ## 一个使用纪律（和 ncu 一样）
 
 **时间线上的时长不能当作性能数字。** nsys 挂上 CUPTI 插桩后，kernel 的执行会被拖慢，
